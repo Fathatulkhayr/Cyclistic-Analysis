@@ -1,5 +1,5 @@
 #  Goggle Data Analytics Captsone Project
-This is the repository for the goggle data analytics capstone project.
+This is the repository for my goggle data analytics capstone project.
 
 # Cyclistic-Analysis
 by Fathatulkhayr
