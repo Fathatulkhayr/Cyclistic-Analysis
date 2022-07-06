@@ -1,0 +1,266 @@
+---
+title: 'Cyclistic Analysis  '
+output:
+  html_document:
+    df_print: paged
+---
+
+First, we install our packages and then, we load them;
+
+```{r}
+install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+install.packages("Tmisc", repos = "http://cran.us.r-project.org")
+install.packages("janitor", repos = "http://cran.us.r-project.org")
+install.packages("lubridate", repos = "http://cran.us.r-project.org")
+
+
+library(tidyverse)
+library(Tmisc)
+library(janitor)
+library(lubridate)
+library(ggplot2)
+
+```
+
+## Note the following
+
+Data Source is: <https://divvy-tripdata.s3.amazonaws.com/index.html> Also see data license agreement here:<https://ride.divvybikes.com/data-license-agreement>
+
+First, we set our directory though
+
+```{r}
+getwd()
+setwd( "C:/Users/USER/Documents/Downloads/Divvy_Trips_2019")
+```
+
+Now, we load our data
+
+```{r}
+q1_2019 <- read_csv("Divvy_Trips_2019_Q1.csv")
+q2_2019 <- read_csv("Divvy_Trips_2019_Q2.csv")
+q3_2019 <- read_csv("Divvy_Trips_2019_Q3.csv")
+q4_2019 <- read_csv("Divvy_Trips_2019_Q4.csv")
+```
+
+Comparing Column names
+
+```{r}
+colnames(q1_2019)
+colnames(q2_2019)
+colnames(q3_2019)
+colnames(q4_2019)
+```
+
+There are inconsistencies in Column names, so now we rename columns to gain uniformity
+
+```{r}
+(q1_2019 <- rename(q1_2019
+                   ,ride_id = trip_id
+                   ,rideable_type = bikeid 
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype))
+
+(q2_2019 <- rename(q2_2019
+                   ,ride_id = "01 - Rental Details Rental ID"
+                   ,rideable_type = "01 - Rental Details Bike ID" 
+                   ,started_at = "01 - Rental Details Local Start Time"  
+                   ,ended_at = "01 - Rental Details Local End Time"  
+                   ,start_station_name = "03 - Rental Start Station Name" 
+                   ,start_station_id = "03 - Rental Start Station ID"
+                   ,end_station_name = "02 - Rental End Station Name" 
+                   ,end_station_id = "02 - Rental End Station ID"
+                   ,member_casual = "User Type"))
+
+(q3_2019 <- rename(q3_2019
+                   ,ride_id = trip_id
+                   ,rideable_type = bikeid 
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype))
+
+(q4_2019 <- rename(q4_2019
+                   ,ride_id = trip_id
+                   ,rideable_type = bikeid 
+                   ,started_at = start_time  
+                   ,ended_at = end_time  
+                   ,start_station_name = from_station_name 
+                   ,start_station_id = from_station_id 
+                   ,end_station_name = to_station_name 
+                   ,end_station_id = to_station_id 
+                   ,member_casual = usertype))
+```
+
+Let's inspect the data frames
+
+```{r}
+str(q1_2019)
+str(q4_2019)
+str(q3_2019)
+str(q2_2019)
+```
+
+Convert ride_id and rideable_type to character
+
+```{r}
+q1_2019 <-  mutate(q1_2019, ride_id = as.character(ride_id)
+                   ,rideable_type = as.character(rideable_type))
+q2_2019 <-  mutate(q2_2019, ride_id = as.character(ride_id)
+                   ,rideable_type = as.character(rideable_type))
+q3_2019 <-  mutate(q3_2019, ride_id = as.character(ride_id)
+                   ,rideable_type = as.character(rideable_type)) 
+q4_2019 <-  mutate(q4_2019, ride_id = as.character(ride_id)
+                   ,rideable_type = as.character(rideable_type))
+```
+
+Combine data frames into one big data frame
+
+```{r}
+all_trips <- bind_rows(q1_2019, q2_2019, q3_2019, q4_2019)
+```
+
+Let's clean up a little
+
+First, we'll inspect
+
+```{r}
+colnames(all_trips)
+nrow(all_trips)
+head(all_trips)
+dim(all_trips)
+str(all_trips)  
+summary(all_trips)
+```
+
+We will reassign some values
+
+```{r}
+all_trips <-  all_trips %>% 
+  mutate(member_casual = recode(member_casual,"Subscriber" = "member","Customer" = "casual"))
+table(all_trips$member_casual)
+```
+
+Aggregating our data next...
+
+```{r}
+all_trips$date <- as.Date(all_trips$started_at) 
+all_trips$month <- format(as.Date(all_trips$date), "%m")
+all_trips$day <- format(as.Date(all_trips$date), "%d")
+all_trips$year <- format(as.Date(all_trips$date), "%y")
+all_trips$day_of_week <- format(as.Date(all_trips$date), "%A")
+
+```
+
+Calculating ride length
+
+```{r}
+all_trips$ride_length <- difftime(all_trips$ended_at,all_trips$started_at)
+
+str(all_trips)
+
+```
+
+Our ride length is currently a factor,we'll convert it to numeric
+
+```{r}
+is.factor(all_trips$ride_length)
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+is.numeric(all_trips$ride_length)
+```
+
+We need to remove our bad data, so we will create a second version of our dtaframe.We are doing this to ensure that our analysis is as accurate as it can be while also ensuring that we acknowledge the changes we've made to the data
+
+```{r}
+all_trips_v2 <- all_trips[!(all_trips$start_station_name == "HQ QR" | all_trips$ride_length<0),]
+```
+
+Let's make some more analysis
+
+```{r}
+summary(all_trips_v2$ride_length)
+```
+
+we will now compare members and casual cyclistic users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = mean)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = median)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = max)
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual, FUN = min)
+```
+
+Average ride time per day
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+```
+
+Let's put that in order
+
+```{r}
+all_trips_v2$day_of_week <- ordered(all_trips_v2$day_of_week, levels=c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+```
+
+Now,average ride time by each day for members vs casual users
+
+```{r}
+aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+```
+
+We will now analyse by user type(member/casual) and weekday
+
+```{r}
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>%  
+  group_by(member_casual, weekday) %>%  
+  summarise(number_of_rides = n()						 
+            ,average_duration = mean(ride_length)) %>% 		
+  arrange(member_casual, weekday)							
+
+```
+
+Now for some visualization
+
+number of rides(weekday vs number of rides):
+
+```{r}
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday)  %>% 
+  ggplot(aes(x = weekday, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Number of Rides vs Users" )
+```
+
+Duration of rides(weekday vs average duration)
+
+```{r}
+all_trips_v2 %>% 
+  mutate(weekday = wday(started_at, label = TRUE)) %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n()
+            ,average_duration = mean(ride_length)) %>% 
+  arrange(member_casual, weekday)  %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge")+
+  labs(title = "Ride Length vs Users")
+```
+
+Let's save a summary file now, for future analysis Link:<https://docs.google.com/spreadsheets/d/1NghhwxNyMhkrzvcg7GT55eAA9FziDNU6i46y89avb-0/edit?usp=sharing>
+
+```{r}
+counts <- aggregate(all_trips_v2$ride_length ~ all_trips_v2$member_casual + all_trips_v2$day_of_week, FUN = mean)
+write.csv(counts, file = 'C:/Users/USER/Documents/avg_ride_length.csv')
+
+```
